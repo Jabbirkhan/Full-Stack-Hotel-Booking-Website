@@ -1,0 +1,32 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@100..900&family=Tinos:ital,wght@0,400;0,700;1,400;1,700&display=swap');
+
+@import "tailwindcss";
+
+*{
+    font-family: "Tinos", serif;
+}
+
+.userNavbar .active{
+    color: #dec29a;
+    border-bottom: 2px solid #dec29a;
+    border-color: #dec29a;
+}
+
+.ownerSidebar .active{
+    background: #dec29a;
+    padding: 3px 4px;
+    border-radius: 4px;
+    color: white;
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator{
+    filter: invert(1);
+    cursor: pointer;
+}
+
+/* Chrome, Safari, Edge, Opera */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
