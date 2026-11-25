@@ -13,55 +13,53 @@ const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173"; // Repl
 const currency = 'USD'
 const deliveryCharge = 20
 
+
 const createStripeSession = async (booking) => {
-    // Stripe Checkout's line_items must be an array
-    // each line item must include a quantity
-    const line_items = booking.map((item) => ({
-        price_data: {
-            currency: currency,
-            product_data: {
-                name: item.name
-            },
-            unit_amount: Math.round(item.price * 100), // Stripe requires amount in cents
-        },
-        quantity: 1,
-    }));
+  const totalAmount = Number(booking.totalAmount);
 
-    line_items.push({
-        price_data: {
-            currency: currency,
-            product_data: {
-                name: "Delivery Charges"
-            },
-            unit_amount: deliveryCharge * 100, // Stripe requires amount in cents
-        },
-        quantity: 1,
-    })
+  if (!Number.isFinite(totalAmount) || totalAmount <= 0) {
+    throw new Error("Invalid booking amount");
+  }
 
-    return stripe.checkout.sessions.create(
-        {
-            mode: "payment",
-            line_items,
-            success_url: `${frontendUrl}/verify?success=true&bookingId=${booking._id}`,
-            cancel_url: `${frontendUrl}/verify?canceled=true&bookingId=${booking._id}`,
-            // Metadata for the Checkout Session.
-            metadata: {
-                bookingId: booking._id.toString(),
-                userId: req.user._id.toString(),
-            },
-            // Metadata for the PaymentIntent used by our webhook.
-            payment_intent_data: {
-                metadata: {
-                    bookingId: booking._id.toString(),
-                    userId: req.user._id.toString(),
-                },
-            },
+  const line_items = [
+    {
+      price_data: {
+        currency,
+        product_data: {
+          name: "Hotel Room Booking",
         },
-        {
-            idempotencyKey: `checkout-session-${booking._id}`,
-        }
-    );
+        unit_amount: Math.round(totalAmount * 100),
+      },
+      quantity: 1,
+    },
+  ];
+
+  return stripe.checkout.sessions.create(
+    {
+      mode: "payment",
+      line_items,
+
+      success_url: `${frontendUrl}/verify?success=true&bookingId=${booking._id}`,
+      cancel_url: `${frontendUrl}/verify?canceled=true&bookingId=${booking._id}`,
+
+      metadata: {
+        bookingId: booking._id.toString(),
+        userId: booking.userId.toString(),
+      },
+
+      payment_intent_data: {
+        metadata: {
+          bookingId: booking._id.toString(),
+          userId: booking.userId.toString(),
+        },
+      },
+    },
+    {
+      idempotencyKey: `checkout-session-${booking._id}`,
+    }
+  );
 };
+
 
 // user can create booking
 const createBooking = async (req, res) => {
@@ -82,8 +80,19 @@ const createBooking = async (req, res) => {
             return res.status(400).json({ success: false, message: "Room is not available for booking" });
         }
 
-        if (!idempotencyKey) {
-            return res.status(400).json({ success: false, message: "A valid idempotency UUID is required" });
+        const isValidUUID =
+            typeof idempotencyKey === "string" &&
+            /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+                idempotencyKey,
+            );
+
+        if (!isValidUUID) {
+            return res
+                .status(400)
+                .json({
+                    success: false,
+                    message: "A valid idempotency UUID is required",
+                });
         }
 
         const existingBooking = await Booking.findOne({
@@ -182,25 +191,25 @@ const handlePaymentIntent = async (paymentIntentId, payment) => {
 
     const { bookingId, userId } = paymentIntent.metadata;
     if (!bookingId || !userId) {
-        return res.json({ success: false, message: "Payment metadata is missing" });
+        throw new Error("Payment metadata is missing");
     }
     const booking = await Booking.findOne({
         _id: bookingId,
         userId,
     });
     if (!booking) {
-        return res.json({ success: false, message: "Booking not found" });
+        throw new Error("Booking not found");
     }
     // Never mark an booking paid unless Stripe confirms it.
     if (payment && paymentIntent.status !== "succeeded") {
-        return res.json({ success: false, message: "Payment is not successfull" });
+        throw new Error("Payment is not successful");
     }
     if (payment && (paymentIntent.currency !== currency || paymentIntent.amount_received !== Math.round(booking.totalAmount * 100))) {
-        return res.json({ success: false, message: "Payment amount or currency mismatch" });
+        throw new Error("Payment amount or currency mismatch");
     }
     // Never downgrade a paid order.
     if (booking.payment) {
-        return;
+        throw new Error("Booking is already paid");
     }
     booking.payment = payment;
     await booking.save();

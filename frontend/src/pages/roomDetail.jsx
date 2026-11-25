@@ -398,7 +398,7 @@ const RoomDetail = () => {
             </div>
 
             {totalNights > 0 && (
-              <button onClick={() => createBooking(room._id)} className="w-full py-4 rounded-xl bg-[#dec29a] hover:bg-[#e4af60] text-black font-semibold uppercase tracking-widest duration-300 cursor-pointer flex items-center justify-center gap-3">
+              <button onClick={() => createBooking(room._id)} className="mt-1 w-full py-4 rounded-xl bg-[#dec29a] hover:bg-[#e4af60] text-black font-semibold uppercase tracking-widest duration-300 cursor-pointer flex items-center justify-center gap-3">
                 Book Reservation
                 <FaArrowRight />
               </button>
